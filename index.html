@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Liste de Boutons</title>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <style>
+    ul {
+      list-style: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Liste de Boutons</h1>
+
+  <form id="bouton-form">
+    <label for="nom-bouton">Nom du Bouton :</label>
+    <input type="text" id="nom-bouton" required>
+    <button type="submit">Créer Bouton</button>
+  </form>
+
+  <button id="export-button">Exporter les Listes</button>
+  <input type="file" id="import-file" accept=".json">
+  <button id="import-button">Importer les Listes</button>
+
+  <ul id="liste-boutons">
+    <!-- La liste des boutons créés apparaîtra ici -->
+  </ul>
+
+  <ul id="historique-clics">
+    <!-- L'historique des clics apparaîtra ici -->
+  </ul>
+
+  <script>
+    $(document).ready(function() {
+      // Chargement des boutons depuis le localStorage
+      loadButtonsFromLocalStorage();
+      loadClickHistoryFromLocalStorage();
+
+      $("#bouton-form").submit(function(e) {
+        e.preventDefault();
+        
+        // Récupérer les valeurs du formulaire
+        var nomBouton = $("#nom-bouton").val();
+        var dateCreation = new Date().toLocaleDateString();
+        var nombreClics = 0;
+
+        // Créer un élément de liste pour le bouton
+        var boutonItem = $("<li>" +
+          "<strong>Nom du Bouton:</strong> " + nomBouton + "<br>" +
+          "<strong>Date de Création:</strong> " + dateCreation + "<br>" +
+          "<strong>Nombre de Clics:</strong> " + nombreClics + "<br>" +
+          "<button class='clic-bouton'>Cliquez ici</button>" +
+          "</li>");
+
+        // Ajouter l'élément à la liste
+        $("#liste-boutons").append(boutonItem);
+
+        // Réinitialiser le formulaire
+        $("#nom-bouton").val("");
+
+        // Enregistrer dans le localStorage
+        saveButtonToLocalStorage(nomBouton, dateCreation, nombreClics);
+
+        // Gérer les clics sur les boutons
+        boutonItem.find(".clic-bouton").click(function() {
+          nombreClics++;
+          boutonItem.find("strong:contains('Nombre de Clics:')").text("Nombre de Clics: " + nombreClics);
+          // Mettre à jour le localStorage
+          updateButtonInLocalStorage(nomBouton, dateCreation, nombreClics);
+          // Ajouter une entrée d'historique de clic
+          addClickToHistory(nomBouton, new Date().toLocaleString());
+        });
+      });
+
+      $("#export-button").click(function() {
+        exportDataToJSON();
+      });
+
+      $("#import-file").on("change", function() {
+        importDataFromJSON(this.files[0]);
+      });
+
+      function saveButtonToLocalStorage(nom, date, clics) {
+        var boutons = JSON.parse(localStorage.getItem("boutons")) || [];
+        boutons.push({ nom: nom, date: date, clics: clics });
+        localStorage.setItem("boutons", JSON.stringify(boutons));
+      }
+
+      function loadButtonsFromLocalStorage() {
+        var boutons = JSON.parse(localStorage.getItem("boutons")) || [];
+        for (var i = 0; i < boutons.length; i++) {
+          var bouton = boutons[i];
+          var boutonItem = $("<li>" +
+            "<strong>Nom du Bouton:</strong> " + bouton.nom + "<br>" +
+            "<strong>Date de Création:</strong> " + bouton.date + "<br>" +
+            "<strong>Nombre de Clics:</strong> " + bouton.clics + "<br>" +
+            "<button class='clic-bouton'>Cliquez ici</button>" +
+            "</li>");
+          $("#liste-boutons").append(boutonItem);
+
+          boutonItem.find(".clic-bouton").click(createButtonClickHandler(bouton));
+        }
+      }
+
+      function updateButtonInLocalStorage(nom, date, clics) {
+        var boutons = JSON.parse(localStorage.getItem("boutons")) || [];
+        for (var i = 0; i < boutons.length; i++) {
+          if (boutons[i].nom === nom && boutons[i].date === date) {
+            boutons[i].clics = clics;
+            break;
+          }
+        }
+        localStorage.setItem("boutons", JSON.stringify(boutons));
+      }
+
+      function createButtonClickHandler(bouton) {
+        return function() {
+          bouton.clics++;
+          $(this).closest("li").find("strong:contains('Nombre de Clics:')").text("Nombre de Clics: " + bouton.clics);
+          // Mettre à jour le localStorage
+          updateButtonInLocalStorage(bouton.nom, bouton.date, bouton.clics);
+          // Ajouter une entrée d'historique de clic
+          addClickToHistory(bouton.nom, new Date().toLocaleString());
+        };
+      }
+
+      function addClickToHistory(nomBouton, date) {
+        var historiqueClics = JSON.parse(localStorage.getItem("historiqueClics")) || [];
+        historiqueClics.push({ nom: nomBouton, date: date });
+        localStorage.setItem("historiqueClics", JSON.stringify(historiqueClics));
+        updateClickHistoryUI();
+      }
+
+      function updateClickHistoryUI() {
+        var historiqueClics = JSON.parse(localStorage.getItem("historiqueClics")) || [];
+        var historiqueList = $("#historique-clics");
+        historiqueList.empty();
+        for (var i = 0; i < historiqueClics.length; i++) {
+          var clic = historiqueClics[i];
+          var historiqueItem = $("<li>" +
+            "Bouton: " + clic.nom + " - Date: " + clic.date +
+            "</li>");
+          historiqueList.append(historiqueItem);
+        }
+      }
+
+      function loadClickHistoryFromLocalStorage() {
+        updateClickHistoryUI();
+      }
+
+      function exportDataToJSON() {
+        var dataToExport = {
+          boutons: JSON.parse(localStorage.getItem("boutons")) || [],
+          historiqueClics: JSON.parse(localStorage.getItem("historiqueClics")) || []
+        };
+
+        var jsonExport = JSON.stringify(dataToExport);
+        var blob = new Blob([jsonExport], { type: "application/json" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = "exported_data.json";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+
+      function importDataFromJSON(file) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          var importedData = JSON.parse(e.target.result);
+          localStorage.setItem("boutons", JSON.stringify(importedData.boutons));
+          localStorage.setItem("historiqueClics", JSON.stringify(importedData.historiqueClics));
+          alert("Données importées avec succès !");
+          location.reload(); // Recharge la page pour refléter les données importées
+        };
+        reader.readAsText(file);
+      }
+    });
+  </script>
+</body>
+</html>
